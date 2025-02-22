@@ -41,10 +41,9 @@ console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logger.addHandler(console_handler)
 logger.info("Weather display script started.")
 
-# Font definitions
-font18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 18)
+# Font definitions (Adjusted forecast font sizes)
 font22 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 22)
-font24 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
+font28 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 28) # Larger font for day of week
 font30 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 30)
 font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)  # For High/Low
 font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
@@ -52,6 +51,7 @@ font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
 font160 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 160)
 font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
 font_tiny = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 14)
+font_forecast_temps = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24) # Larger font for temps
 font_location = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 20)
 
 COLORS = {'black': 'rgb(0,0,0)', 'white': 'rgb(255,255,255)', 'grey': 'rgb(235,235,235)'}
@@ -116,14 +116,14 @@ def generate_display_image(weather_data):
         icon_image = Image.open(icon_path) if os.path.exists(icon_path) else None
 
         if icon_image:
-            template.paste(icon_image, (40, 15))  # Original icon position
+            template.paste(icon_image, (40, 15))
 
-        # Current Temp (back to original position)
-        draw.text((375, 35), f"{weather_data['temp_current']:.0f}°F", font=font160, fill=COLORS['black'])
+        # Current Temp
+        draw.text((375, 10), f"{weather_data['temp_current']:.0f}°F", font=font160, fill=COLORS['black'])
 
-        # "Now" and "Precip" to the right of temp
-        draw.text((600, 60), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")  # Anchor middle-center
-        draw.text((600, 110), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
+        # "Now" and "Precip"
+        draw.text((180, 60), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")
+        draw.text((180, 110), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
 
         # Rain forecast bars and timescale
         if weather_data['minutely_precipitation']:
@@ -148,19 +148,20 @@ def generate_display_image(weather_data):
                     time_label = (now + timedelta(minutes=i)).strftime('%I:%M')
                     draw.text((x_start + i * (bar_width + 2) - 10, y_start + 5), time_label, font=font_tiny, fill=COLORS['black'])
 
-        # 5-Day Forecast Display
+        # 5-Day Forecast Display (Larger and Adjusted Positions)
         x_offset = 345
         y_offset = 200
         day_spacing = 90
 
         for i, day_data in enumerate(weather_data['daily_forecast']):
-            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font24, fill=COLORS['black'])
+            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font28, fill=COLORS['black'])  # Larger font
             icon_forecast_path = os.path.join(ICON_DIR, f"{day_data['icon_code']}.png")
             if os.path.exists(icon_forecast_path):
                 icon_forecast_image = Image.open(icon_forecast_path)
-                icon_forecast_image = icon_forecast_image.resize((32, 32))
-                template.paste(icon_forecast_image, (x_offset + i * day_spacing + 20, y_offset + 25))
-            draw.text((x_offset + i * day_spacing, y_offset + 60), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font18, fill=COLORS['black'])
+                # Resize icon by 1/3 larger
+                icon_forecast_image = icon_forecast_image.resize((int(32 * 1.33), int(32 * 1.33)))
+                template.paste(icon_forecast_image, (x_offset + i * day_spacing + 15, y_offset + 30)) # Adjusted for larger icon
+            draw.text((x_offset + i * day_spacing, y_offset + 80), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font_forecast_temps, fill=COLORS['black']) # larger font, moved down
 
         # Time updated
         current_time = datetime.now().strftime('%I:%M %p')
@@ -177,7 +178,7 @@ def generate_display_image(weather_data):
         draw.text((10, y_info + 80), uvi_string, font=font22, fill=COLORS['black'])
         draw.text((10, y_info + 120), LOCATION, font=font_location, fill=COLORS['black'])
 
-        # High/Low below other info
+        # High/Low
         draw.text((10, y_info + 160), f"High: {weather_data['temp_max']:.0f}°F", font=font40, fill=COLORS['black'])
         draw.text((10, y_info + 200), f"Low: {weather_data['temp_min']:.0f}°F", font=font40, fill=COLORS['black'])
 
