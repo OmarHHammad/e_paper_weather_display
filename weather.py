@@ -13,11 +13,7 @@ sys.path.append(lib_path)
 from waveshare_epd import epd7in5_V2
 
 # User defined configuration
-API_KEY = 'XXXXXXXX'  # Your API key
-LOCATION = 'Seattle, Washington'  # Name of location
-LATITUDE = 'XXXXXXXX'  # Latitude
-LONGITUDE = 'XXXXXXXX'  # Longitude
-UNITS = 'imperial'  # imperial or metric
+
 
 BASE_URL = f'https://api.openweathermap.org/data/3.0/onecall'
 FONT_DIR = os.path.join(os.path.dirname(__file__), 'font')
@@ -49,7 +45,7 @@ font30 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 30)
 font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)
 font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
 font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
-font120 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 120) #slightly smaller
+font120 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100) #slightly smaller
 font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
 font_tiny = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 14)
 font_forecast_temps = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
@@ -110,21 +106,21 @@ def generate_display_image(weather_data):
 
         # --- Section Dividers ---
         draw.line([(0, 190), (epd.width, 190)], fill=COLORS['black'], width=2)
-        draw.line([(330, 190), (330, epd.height)], fill=COLORS['black'], width=2)
+        draw.line([(220, 190), (220, epd.height)], fill=COLORS['black'], width=2)
 
 
         icon_path = os.path.join(ICON_DIR, f"{weather_data['icon_code']}.png")
         icon_image = Image.open(icon_path) if os.path.exists(icon_path) else None
 
         if icon_image:
-            template.paste(icon_image, (40, 15))
+            template.paste(icon_image, (15, 15))
 
         # Current Temp (moved right, smaller)
-        draw.text((400, 10), f"{weather_data['temp_current']:.0f}°F", font=font120, fill=COLORS['black'])
+        draw.text((195, 30), f"{weather_data['temp_current']:.0f}°F", font=font120, fill=COLORS['black'])
 
         # "Now" and "Precip" (moved further right)
-        draw.text((282, 60), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")  # Further right
-        draw.text((282, 110), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
+        draw.text((570, 80), f" {weather_data['report']}", font=font30, fill=COLORS['black'], anchor="mm")  # Further right
+        draw.text((570, 110), f"Precipitation: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
 
 
         # Rain forecast bars and timescale
@@ -133,7 +129,7 @@ def generate_display_image(weather_data):
             if max_precipitation > 0:
                 bar_height_multiplier = 100 / max_precipitation
                 bar_width = 5
-                x_start = 345 - int(470 * 0.4)  # Adjusted for the forecast
+                x_start = 345 - int(470 * 0.10)  # Adjusted for the forecast
                 y_start = 450
                 num_bars = len(weather_data['minutely_precipitation'])
 
@@ -154,9 +150,9 @@ def generate_display_image(weather_data):
                         break  # Stop if labels run offscreen
 
         # 6-Day Forecast Display (Moved Left)
-        x_offset = 345 - int(470 * 0.40)  # Start 40% further left
+        x_offset = 345 - int(470 * 0.20)  # Start 40% further left
         y_offset = 200
-        day_spacing = int(470 * 1.60 / 6)    # spacing across 6 days
+        day_spacing = int(470 * 1.2 / 6)    # spacing across 6 days
 
         for i, day_data in enumerate(weather_data['daily_forecast']):
             draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font24, fill=COLORS['black'])
