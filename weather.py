@@ -41,18 +41,17 @@ console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logger.addHandler(console_handler)
 logger.info("Weather display script started.")
 
-# Font definitions (including a bold font)
-font18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 18)
+# Font definitions (Adjusted forecast font sizes)
+font18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 18)  # Keep this for High/low on forecast
 font22 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 22)
+font24 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24) # For forecast day
 font30 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 30)
-font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)  # For High/Low
+font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)  # For High/Low (current day)
 font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
 font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
 font160 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 160)
 font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)  # Bigger time
 font_tiny = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 14)
-font_bold24 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font-Bold.ttf'), 24)  # Bold font for forecast
-font_bold18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font-Bold.ttf'), 18)  # Bold, smaller
 font_location = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 20)
 
 COLORS = {'black': 'rgb(0,0,0)', 'white': 'rgb(255,255,255)', 'grey': 'rgb(235,235,235)'}
@@ -85,7 +84,7 @@ def process_weather_data(data):
             "daily_forecast": [],
             "sunrise": current['sunrise'],
             "sunset": current['sunset'],
-            "uvi": current['uvi'], # Use UVI as a proxy for air quality if no dedicated AQI
+            "uvi": current['uvi'], # Use UVI as a proxy for air quality
         }
         for day_data in daily[:5]:
             forecast_entry = {
@@ -127,12 +126,10 @@ def generate_display_image(weather_data):
         draw.text((175, int(center_y - 35)), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")
         draw.text((175, int(center_y + 5)), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
 
-
-
-        # Current Temp, moved up and centered with the icon
+        # Current Temp
         draw.text((165, int(center_y - 115)), f"{weather_data['temp_current']:.0f}°F", font=font100, fill=COLORS['black'], anchor="mt")
 
-        #High and Low, moved
+        #High and Low
         draw.text((260, 35), f"H: {weather_data['temp_max']:.0f}°F", font=font40, fill=COLORS['black'])
         draw.text((260, 95), f"L: {weather_data['temp_min']:.0f}°F", font=font40, fill=COLORS['black'])
 
@@ -159,32 +156,30 @@ def generate_display_image(weather_data):
                     time_label = (now + timedelta(minutes=i)).strftime('%I:%M')
                     draw.text((x_start + i * (bar_width + 2) - 10, y_start + 5), time_label, font=font_tiny, fill=COLORS['black'])
 
-        # 5-Day Forecast Display (Bold and Bigger)
+        # 5-Day Forecast Display (Adjusted Font Sizes)
         x_offset = 345
         y_offset = 200
         day_spacing = 90
 
         for i, day_data in enumerate(weather_data['daily_forecast']):
-            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font_bold24, fill=COLORS['black'])  # Bold font
+            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font24, fill=COLORS['black'])  # Larger font for day
             icon_forecast_path = os.path.join(ICON_DIR, f"{day_data['icon_code']}.png")
             if os.path.exists(icon_forecast_path):
                 icon_forecast_image = Image.open(icon_forecast_path)
                 icon_forecast_image = icon_forecast_image.resize((32, 32))
                 template.paste(icon_forecast_image, (x_offset + i * day_spacing + 20, y_offset + 25))
-            draw.text((x_offset + i * day_spacing, y_offset + 60), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font_bold18, fill=COLORS['black']) #Bold Font
+            draw.text((x_offset + i * day_spacing, y_offset + 60), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font18, fill=COLORS['black']) # font for high/low
 
-        # Time updated (bigger)
+        # Time updated
         current_time = datetime.now().strftime('%I:%M %p')
         draw.text((720, 10), current_time, font=font_small, fill=COLORS['black'])
-
 
         # Bottom-left corner information
         sunrise_time = datetime.fromtimestamp(weather_data['sunrise']).strftime('%I:%M %p')
         sunset_time = datetime.fromtimestamp(weather_data['sunset']).strftime('%I:%M %p')
-        #Simple string of uvi, so no case statement
         uvi_string = f"UV Index: {weather_data['uvi']}"
 
-        y_info = 200  # Starting Y position for info
+        y_info = 200
         draw.text((10, y_info), f"Sunrise: {sunrise_time}", font=font22, fill=COLORS['black'])
         draw.text((10, y_info + 40), f"Sunset: {sunset_time}", font=font22, fill=COLORS['black'])
         draw.text((10, y_info + 80), uvi_string, font=font22, fill=COLORS['black'])
