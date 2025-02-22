@@ -19,8 +19,8 @@ API_KEY = 'XXXXXXXX'  # Your API key for openweathermap.com
 LOCATION = 'XXXXXXXX'  # Name of location
 LATITUDE = 'XXXXXXXX'  # Latitude
 LONGITUDE = 'XXXXXXXX'  # Longitude
-UNITS = 'imperial' # imperial or metric
-CSV_OPTION = True # if csv_option == True, a weather data will be appended to 'record.csv'
+UNITS = 'imperial'  # imperial or metric
+CSV_OPTION = True  # if csv_option == True, a weather data will be appended to 'record.csv'
 TRASH_DAYS = [2]  # 0 = Monday, 6 = Sunday; Multiple days can be passed as a list
 
 BASE_URL = f'https://api.openweathermap.org/data/3.0/onecall'
@@ -58,6 +58,7 @@ font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
 font60 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 60)
 font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
 font160 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 160)
+font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 16) # for time in top right
 COLORS = {'black': 'rgb(0,0,0)', 'white': 'rgb(255,255,255)', 'grey': 'rgb(235,235,235)'}
 
 # Fetch weather data
@@ -77,6 +78,9 @@ def process_weather_data(data):
     try:
         current = data['current']
         daily = data['daily'][0]
+        hourly = data.get('hourly', [])  # Default to empty list if 'hourly' is missing
+        minutely = data.get('minutely', [])
+
         weather_data = {
             "temp_current": current['temp'],
             "feels_like": current['feels_like'],
@@ -87,6 +91,8 @@ def process_weather_data(data):
             "temp_max": daily['temp']['max'],
             "temp_min": daily['temp']['min'],
             "precip_percent": daily['pop'] * 100,
+            "minutely_precipitation": [minute['precipitation'] for minute in minutely] if minutely else []
+
         }
         logging.info("Weather data processed successfully.")
         return weather_data
@@ -133,18 +139,29 @@ def generate_display_image(weather_data):
         draw.text((350, 210), f"Feels like: {weather_data['feels_like']:.0f}°F", font=font50, fill=COLORS['black'])
         draw.text((35, 325), f"High: {weather_data['temp_max']:.0f}°F", font=font50, fill=COLORS['black'])
         draw.text((35, 390), f"Low: {weather_data['temp_min']:.0f}°F", font=font50, fill=COLORS['black'])
-        draw.text((345, 340), f"Humidity: {weather_data['humidity']}%", font=font30, fill=COLORS['black'])
-        draw.text((345, 400), f"Wind: {weather_data['wind']:.1f} MPH", font=font30, fill=COLORS['black'])
-        draw.text((627, 330), "UPDATED", font=font35, fill=COLORS['white'])
-        current_time = datetime.now().strftime('%H:%M')
-        draw.text((627, 375), current_time, font=font60, fill=COLORS['white'])
 
-        # Trash reminder based on TRASH_DAYS config
-        weekday = datetime.today().weekday()
-        if weekday in TRASH_DAYS:
-            draw.rectangle((345, 13, 705, 55), fill=COLORS['black'])
-            draw.text((355, 15), 'TAKE OUT TRASH TODAY!', font=font30, fill=COLORS['white'])
-        
+        # Rain forecast bars
+        if weather_data['minutely_precipitation']:
+            max_precipitation = max(weather_data['minutely_precipitation'])
+            if max_precipitation > 0:  # Only draw if there's rain
+                bar_height_multiplier = 100 / max_precipitation  # Scale bars to max 100px
+                bar_width = 5
+                x_start = 345
+                y_start = 450
+                
+                for i, precip in enumerate(weather_data['minutely_precipitation']):
+                    bar_height = min(precip * bar_height_multiplier, 100) # Cap at 100px
+                    draw.rectangle(
+                        [(x_start + i * (bar_width + 2), y_start - bar_height),
+                         (x_start + i * (bar_width + 2) + bar_width, y_start)],
+                        fill=COLORS['black']
+                    )
+
+
+        # Time updated in the top right (12-hour format)
+        current_time = datetime.now().strftime('%I:%M %p')  # 12-hour format with AM/PM
+        draw.text((720, 10), current_time, font=font_small, fill=COLORS['black'])
+         
         logging.info("Display image generated successfully.")
         return template
     except Exception as e:
