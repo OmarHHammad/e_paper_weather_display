@@ -49,7 +49,7 @@ font30 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 30)
 font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)
 font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
 font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
-font160 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 160)
+font130 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 130) #slightly smaller
 font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
 font_tiny = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 14)
 font_forecast_temps = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)
@@ -119,28 +119,29 @@ def generate_display_image(weather_data):
         if icon_image:
             template.paste(icon_image, (40, 15))
 
-        # Current Temp
-        draw.text((375, 10), f"{weather_data['temp_current']:.0f}°F", font=font160, fill=COLORS['black'])
+        # Current Temp (smaller)
+        draw.text((375, 10), f"{weather_data['temp_current']:.0f}°F", font=font130, fill=COLORS['black'])
 
-        # "Now" and "Precip"
-        draw.text((216, 60), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")
-        draw.text((216, 110), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
+        # "Now" and "Precip" (moved further right)
+        draw.text((248, 60), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")  # Further right
+        draw.text((248, 110), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
 
-        # Rain forecast bars and timescale
+        # Rain forecast bars and timescale (extended)
         if weather_data['minutely_precipitation']:
             max_precipitation = max(weather_data['minutely_precipitation'])
             if max_precipitation > 0:
                 bar_height_multiplier = 100 / max_precipitation
                 bar_width = 5
-                x_start = 345
+                x_start = 345 + int(470*0.2) # Adjusted for the forecast
                 y_start = 450
                 num_bars = len(weather_data['minutely_precipitation'])
 
                 for i, precip in enumerate(weather_data['minutely_precipitation']):
                     bar_height = min(precip * bar_height_multiplier, 100)
+                    #Extend to x = 760
                     draw.rectangle(
                         [(x_start + i * (bar_width + 2), y_start - bar_height),
-                         (x_start + i * (bar_width + 2) + bar_width, y_start)],
+                         (min(x_start + i * (bar_width + 2) + bar_width, 800), y_start)],  # Limit x to screen width
                         fill=COLORS['black']
                     )
 
@@ -148,11 +149,14 @@ def generate_display_image(weather_data):
                 for i in range(0, num_bars, 15):
                     time_label = (now + timedelta(minutes=i)).strftime('%I:%M')
                     draw.text((x_start + i * (bar_width + 2) - 10, y_start + 5), time_label, font=font_tiny, fill=COLORS['black'])
+                    if (x_start + i * (bar_width + 2)) > 790:
+                        break # Stop if labels run offscreen
 
-        # 6-Day Forecast Display
-        x_offset = 345
+
+        # 6-Day Forecast Display (Wider Spacing)
+        x_offset = 345 + int(470 * 0.20)  # Start 20% further right
         y_offset = 200
-        day_spacing = 75
+        day_spacing = int(470 * 1.20 / 6)   #  spacing across 6 days
 
         for i, day_data in enumerate(weather_data['daily_forecast']):
             draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font24, fill=COLORS['black'])
@@ -163,9 +167,9 @@ def generate_display_image(weather_data):
                 template.paste(icon_forecast_image, (x_offset + i * day_spacing + 10, y_offset + 30))
             draw.text((x_offset + i * day_spacing, y_offset + 80), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font_forecast_temps, fill=COLORS['black'])
 
-        # Time updated (moved left)
+        # Time updated
         current_time = datetime.now().strftime('%I:%M %p')
-        draw.text((680, 10), current_time, font=font_small, fill=COLORS['black']) #680
+        draw.text((680, 10), current_time, font=font_small, fill=COLORS['black'])
 
         # Bottom-left corner information
         sunrise_time = datetime.fromtimestamp(weather_data['sunrise']).strftime('%I:%M %p')
