@@ -14,7 +14,7 @@ from waveshare_epd import epd7in5_V2
 
 # User defined configuration
 API_KEY = 'XXXXXXXX'  # Your API key
-LOCATION = 'XXXXXXXX'  # Name of location
+LOCATION = 'Seattle, Washington'  # Name of location
 LATITUDE = 'XXXXXXXX'  # Latitude
 LONGITUDE = 'XXXXXXXX'  # Longitude
 UNITS = 'imperial'  # imperial or metric
@@ -41,15 +41,19 @@ console_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(
 logger.addHandler(console_handler)
 logger.info("Weather display script started.")
 
-# Font definitions
+# Font definitions (including a bold font)
 font18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 18)
 font22 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 22)
 font30 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 30)
+font40 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 40)  # For High/Low
 font50 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 50)
 font100 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 100)
 font160 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 160)
-font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 20)
+font_small = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 24)  # Bigger time
 font_tiny = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 14)
+font_bold24 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font-Bold.ttf'), 24)  # Bold font for forecast
+font_bold18 = ImageFont.truetype(os.path.join(FONT_DIR, 'Font-Bold.ttf'), 18)  # Bold, smaller
+font_location = ImageFont.truetype(os.path.join(FONT_DIR, 'Font.ttc'), 20)
 
 COLORS = {'black': 'rgb(0,0,0)', 'white': 'rgb(255,255,255)', 'grey': 'rgb(235,235,235)'}
 
@@ -78,7 +82,10 @@ def process_weather_data(data):
             "temp_min": daily[0]['temp']['min'],
             "precip_percent": daily[0]['pop'] * 100,
             "minutely_precipitation": [minute['precipitation'] for minute in minutely] if minutely else [],
-            "daily_forecast": []
+            "daily_forecast": [],
+            "sunrise": current['sunrise'],
+            "sunset": current['sunset'],
+            "uvi": current['uvi'], # Use UVI as a proxy for air quality if no dedicated AQI
         }
         for day_data in daily[:5]:
             forecast_entry = {
@@ -102,21 +109,32 @@ def generate_display_image(weather_data):
         draw = ImageDraw.Draw(template)
 
         # --- Section Dividers ---
-        draw.line([(0, 190), (epd.width, 190)], fill=COLORS['black'], width=2)  # Horizontal line
-        draw.line([(330, 190), (330, epd.height)], fill=COLORS['black'], width=2)  # Vertical line
+        draw.line([(0, 190), (epd.width, 190)], fill=COLORS['black'], width=2)
+        draw.line([(330, 190), (330, epd.height)], fill=COLORS['black'], width=2)
 
 
         icon_path = os.path.join(ICON_DIR, f"{weather_data['icon_code']}.png")
         icon_image = Image.open(icon_path) if os.path.exists(icon_path) else None
 
         if icon_image:
-            template.paste(icon_image, (40, 15))
+            icon_width, icon_height = icon_image.size
+            template.paste(icon_image, (int((330 - icon_width) / 2), 15))  # Center the icon
 
-        draw.text((30, 200), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'])
-        draw.text((30, 240), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'])
-        draw.text((375, 35), f"{weather_data['temp_current']:.0f}°F", font=font160, fill=COLORS['black'])
-        draw.text((35, 325), f"High: {weather_data['temp_max']:.0f}°F", font=font50, fill=COLORS['black'])
-        draw.text((35, 390), f"Low: {weather_data['temp_min']:.0f}°F", font=font50, fill=COLORS['black'])
+            # Calculate center y for text based on icon height
+            center_y = 15 + icon_height / 2
+
+        # "Now" and "Precip" to the right of the icon, centered vertically
+        draw.text((175, int(center_y - 35)), f"Now: {weather_data['report']}", font=font22, fill=COLORS['black'], anchor="mm")
+        draw.text((175, int(center_y + 5)), f"Precip: {weather_data['precip_percent']:.0f}%", font=font30, fill=COLORS['black'], anchor="mm")
+
+
+
+        # Current Temp, moved up and centered with the icon
+        draw.text((165, int(center_y - 115)), f"{weather_data['temp_current']:.0f}°F", font=font100, fill=COLORS['black'], anchor="mt")
+
+        #High and Low, moved
+        draw.text((260, 35), f"H: {weather_data['temp_max']:.0f}°F", font=font40, fill=COLORS['black'])
+        draw.text((260, 95), f"L: {weather_data['temp_min']:.0f}°F", font=font40, fill=COLORS['black'])
 
         # Rain forecast bars and timescale
         if weather_data['minutely_precipitation']:
@@ -124,7 +142,7 @@ def generate_display_image(weather_data):
             if max_precipitation > 0:
                 bar_height_multiplier = 100 / max_precipitation
                 bar_width = 5
-                x_start = 345  # Adjusted for the dividing line
+                x_start = 345
                 y_start = 450
                 num_bars = len(weather_data['minutely_precipitation'])
 
@@ -141,23 +159,36 @@ def generate_display_image(weather_data):
                     time_label = (now + timedelta(minutes=i)).strftime('%I:%M')
                     draw.text((x_start + i * (bar_width + 2) - 10, y_start + 5), time_label, font=font_tiny, fill=COLORS['black'])
 
-        # 5-Day Forecast Display
-        x_offset = 345  # Adjusted for the dividing line
+        # 5-Day Forecast Display (Bold and Bigger)
+        x_offset = 345
         y_offset = 200
         day_spacing = 90
 
         for i, day_data in enumerate(weather_data['daily_forecast']):
-            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font18, fill=COLORS['black'])
+            draw.text((x_offset + i * day_spacing, y_offset), day_data['date'], font=font_bold24, fill=COLORS['black'])  # Bold font
             icon_forecast_path = os.path.join(ICON_DIR, f"{day_data['icon_code']}.png")
             if os.path.exists(icon_forecast_path):
                 icon_forecast_image = Image.open(icon_forecast_path)
                 icon_forecast_image = icon_forecast_image.resize((32, 32))
                 template.paste(icon_forecast_image, (x_offset + i * day_spacing + 20, y_offset + 25))
-            draw.text((x_offset + i * day_spacing, y_offset + 60), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font18, fill=COLORS['black'])
+            draw.text((x_offset + i * day_spacing, y_offset + 60), f"{day_data['temp_max']:.0f}°/{day_data['temp_min']:.0f}°", font=font_bold18, fill=COLORS['black']) #Bold Font
 
-        # Time updated
+        # Time updated (bigger)
         current_time = datetime.now().strftime('%I:%M %p')
         draw.text((720, 10), current_time, font=font_small, fill=COLORS['black'])
+
+
+        # Bottom-left corner information
+        sunrise_time = datetime.fromtimestamp(weather_data['sunrise']).strftime('%I:%M %p')
+        sunset_time = datetime.fromtimestamp(weather_data['sunset']).strftime('%I:%M %p')
+        #Simple string of uvi, so no case statement
+        uvi_string = f"UV Index: {weather_data['uvi']}"
+
+        y_info = 200  # Starting Y position for info
+        draw.text((10, y_info), f"Sunrise: {sunrise_time}", font=font22, fill=COLORS['black'])
+        draw.text((10, y_info + 40), f"Sunset: {sunset_time}", font=font22, fill=COLORS['black'])
+        draw.text((10, y_info + 80), uvi_string, font=font22, fill=COLORS['black'])
+        draw.text((10, y_info + 120), LOCATION, font=font_location, fill=COLORS['black'])
 
         return template
     except Exception as e:
